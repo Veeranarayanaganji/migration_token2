@@ -1,0 +1,84 @@
+name: Multiple Organization Token Acceptance 
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  extract_Lock_level:
+    runs-on: ubuntu-latest
+    outputs:
+      lock_level: ${{ steps.extract.outputs.migration_level }}
+    steps:
+      - name: Get Lock Level from Issue Body
+        id: extract
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issueBody = context.payload.issue.body;
+            const LockLevelMatch = issueBody.match(/### migration_level \s*\n*(.*)/);
+            const LockLevel = LockLevelMatch ? LockLevelMatch[1].trim() : "lock"; // default to lock
+            console.log("Lock Level: ", LockLevel);
+            core.setOutput("migration_level", LockLevel.toLowerCase()); // Normalize to lowercase
+
+  lock_unlock:
+    runs-on: ubuntu-latest
+    needs: extract_Lock_level
+    env:
+            GITHUB_TOKEN: ${{ secrets.SOURCE_TOKEN }}
+    steps:
+      - name: Get Issue Body
+        id: issue_body
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issueBody = context.payload.issue.body;
+            const sourceOrgMatch = issueBody.match(/### Source Organization\s*\n*(.*)/);
+            const sourceRepoMatch = issueBody.match(/### Source Repository\s*\n*(.*)/);
+            const targetOrgMatch = issueBody.match(/### Target Organization\s*\n*(.*)/);
+            const targetRepoMatch = issueBody.match(/### Target Repository\s*\n*(.*)/);
+
+            const sourceOrg = sourceOrgMatch ? sourceOrgMatch[1].trim() : "Not provided";
+            const sourceRepo = sourceRepoMatch ? sourceRepoMatch[1].trim() : "Not provided";
+            const targetOrg = targetOrgMatch ? targetOrgMatch[1].trim() : "Not provided";
+            const targetRepo = targetRepoMatch ? targetRepoMatch[1].trim() : "Not provided";
+
+            core.setOutput("source_org", sourceOrg);
+            core.setOutput("source_repo", sourceRepo);
+            core.setOutput("target_org", targetOrg);
+            core.setOutput("target_repo", targetRepo);
+
+      - name: Validate PAT tokens
+        run: |
+            if [[ -z "${{ secrets.SOURCE_TOKEN }}" ]]; then
+              echo "Source Token is missing!"
+              exit 1
+            fi
+        shell: bash
+
+      steps:
+      - name: Set Organization Token
+        id: set_token
+        run: |
+          if [ "${{ github.event.inputs.organization }}" == "SourceOrganizationMGM" ]; then
+            echo "ORG_TOKEN=${{ secrets.ORG_TOKEN_A }}" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.organization }}" == "TargetOrganizationMGM" ]; then
+            echo "ORG_TOKEN=${{ secrets.ORG_TOKEN_B }}" >> $GITHUB_ENV
+          else
+            echo "Invalid organization selected."
+            exit 1
+          fi
+ 
+      - name: Manage Issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.SOURCE_TOKEN }}
+          ORG_TOKEN: ${{ secrets.SOURCE_ORG_TOKEN }}
+          #ORG_TOKEN: ${{ env.SOURCE_ORG_TOKEN }}
+        run: |
+          # Example command to create an issue or perform an action
+          echo "Using token for ${{ github.event.inputs.organization }}"
+          # Use ORG_TOKEN for your IssueOps actions here
+          # e.g., curl to create an issue
+          # curl -X POST -H "Authorization: token $SOURCE_ORG_TOKEN" \
+          #      -d '{"title": "New Issue", "body": "Issue created using configurable token."}' \
+          #      "https://api.github.com/repos/owner/repo/issues"
