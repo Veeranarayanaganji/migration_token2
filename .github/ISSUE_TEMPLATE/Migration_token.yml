@@ -22,19 +22,18 @@ body:
       description: "Enter the name of the source Repository"
       placeholder: "e.g., s_repo1"
 
-  - type: input
+  - type: dropdown
     id: target_org
     attributes:
       label: "Target Organization"
       description: "Enter the name of the target organization"
-      placeholder: "e.g., sam-org2"
       options:
         - 'SourceOrganizationMGM'
         - 'TargetOrganizationMGM'
     validations:
       required: true
 
-  - type: dropdown
+  - type: input
     id: target_repo
     attributes:
       label: "Target Repository"
